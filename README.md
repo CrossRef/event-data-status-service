@@ -1,5 +1,9 @@
 # Event Data Status Service
 
+Service for allowing components of Event Data to report their activity. Display activity in an API and dashboard.
+
+Status: Under development as of September 2016
+
 ## Config
 
 
