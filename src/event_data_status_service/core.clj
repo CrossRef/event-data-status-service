@@ -16,7 +16,8 @@
   A channel is used to serialize access to the bucket.
   "
   (:require [clojure.data.json :as json]
-            [clojure.core.async :refer [>!! <!! chan go-loop]])
+            [clojure.core.async :refer [>!! <!! <! chan go-loop]]
+            [clojure.tools.logging :as log])
   (:require [config.core :refer [env]]
             [liberator.core :as l]
             [compojure.core :as c]
@@ -26,8 +27,7 @@
             [clj-time.coerce :as coerce]
             [clj-time.core :as clj-time]
             [clj-time.format :as format]
-            [clj-time.periodic :as periodic]
-            [clojure.tools.logging :as log])
+            [clj-time.periodic :as periodic])
   (:import [redis.clients.jedis Jedis JedisPool JedisPoolConfig])
   (:gen-class))
 
@@ -91,14 +91,14 @@
                 (catch IllegalArgumentException _ true)))
   
   :exists? (fn [ctx]
-             (let [date-range (reverse (take (::days ctx) (periodic/periodic-seq (::date ctx) (clj-time/days -1))))
-                   date-str-range (map (partial format/unparse ymd) date-range)
-                   conn (get-connection)
-                   ; Get seq of structures.
-                   days-serialized (map #(.get conn (str day-key-prefix %)) date-str-range)
-                   all-exist? (not-any? empty? days-serialized)]
-               [all-exist? {::dates date-str-range
-                            ::days-serialized days-serialized}]))
+             (with-open [conn (get-connection)]
+               (let [date-range (reverse (take (::days ctx) (periodic/periodic-seq (::date ctx) (clj-time/days -1))))
+                     date-str-range (map (partial format/unparse ymd) date-range)
+                     ; Get seq of structures.
+                     days-serialized (map #(.get conn (str day-key-prefix %)) date-str-range)
+                     all-exist? (not-any? empty? days-serialized)]
+                 [all-exist? {::dates date-str-range
+                              ::days-serialized days-serialized}])))
   
   :handle-ok (fn [ctx]
                (let [; days-data is a seq of buckets of complete structure in JSON
@@ -120,16 +120,20 @@
  :allowed-methods [:post]
  :available-media-types ["text/plain"]
  :authorized? (fn [ctx]
-                (@auth-tokens
-                  (nth (re-find #"Token (.*)" (get-in ctx [:request :headers "authorization"])) 1)))
+                (try
+                  (@auth-tokens
+                    (nth (re-find #"Token (.*)" (get-in ctx [:request :headers "authorization"])) 1))
+                  ; NPE if not found.
+                  (catch NullPointerException _ false)))
  :malformed? (fn [ctx]
                (let [value (Integer/parseInt (slurp (get-in ctx [:request :body])))]
                  [false {::value value}]))
  :handle-ok "ok"
  :post! (fn [ctx]
-          (let [conn (get-connection)
-                date-bucket (str day-key-prefix (format/unparse ymd (clj-time/now)))]
-            (>!! status-updates-chan [date-bucket service component facet (::value ctx)]))))
+          (log/info "Accept" service component facet (::value ctx))
+          (with-open [conn (get-connection)]
+            (let [date-bucket (str day-key-prefix (format/unparse ymd (clj-time/now)))]
+              (>!! status-updates-chan [date-bucket service component facet (::value ctx)])))))
 
 
 
@@ -145,14 +149,14 @@
 (defn -main
   [& args]
   
+  (log/info "Start Status service")
   ; Loop over updates and apply them. Because data is stored in a bucket per day, this requires bucket-level locking
   ; which is achieved by a single goroutine performing the update.
-  (go-loop [[date-bucket service component facet increment-count] (<!! status-updates-chan)
-            connection (get-connection)]
-    (log/debug "Inc" service component facet "by" increment-count)
-    (let [before (.get connection date-bucket)
-          updated (update-bucket-data before (format/unparse ymdhm (clj-time/now)) service component facet increment-count)]
-      (.set connection date-bucket updated))
-    (recur (<!! status-updates-chan) connection))
+  (go-loop [[date-bucket service component facet increment-count] (<!! status-updates-chan)]
+    (with-open [connection (get-connection)]
+      (let [before (.get connection date-bucket)
+            updated (update-bucket-data before (format/unparse ymdhm (clj-time/now)) service component facet increment-count)]
+        (.set connection date-bucket updated)))
+      (recur (<! status-updates-chan)))
   
   (server/run-server app {:port (Integer/parseInt (:port env))}))
