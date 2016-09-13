@@ -27,7 +27,8 @@
             [clj-time.coerce :as coerce]
             [clj-time.core :as clj-time]
             [clj-time.format :as format]
-            [clj-time.periodic :as periodic])
+            [clj-time.periodic :as periodic]
+            [overtone.at-at :as at-at])
   (:import [redis.clients.jedis Jedis JedisPool JedisPoolConfig])
   (:gen-class))
 
@@ -131,9 +132,8 @@
  :handle-ok "ok"
  :post! (fn [ctx]
           (log/info "Accept" service component facet (::value ctx))
-          (with-open [conn (get-connection)]
             (let [date-bucket (str day-key-prefix (format/unparse ymd (clj-time/now)))]
-              (>!! status-updates-chan [date-bucket service component facet (::value ctx)])))))
+              (>!! status-updates-chan [date-bucket service component facet (::value ctx)]))))
 
 
 
@@ -145,6 +145,8 @@
 (def app
   (-> routes
       (wrap-params)))
+
+(def schedule-pool (at-at/mk-pool))
 
 (defn -main
   [& args]
@@ -158,5 +160,12 @@
             updated (update-bucket-data before (format/unparse ymdhm (clj-time/now)) service component facet increment-count)]
         (.set connection date-bucket updated)))
       (recur (<! status-updates-chan)))
+
+  ; Keep a timer going to show the evidence service is still up!
+  ; Also useful when there is more than once load-balanced instance.
+  (at-at/every 60000 (fn []
+                       (let [date-bucket (str day-key-prefix (format/unparse ymd (clj-time/now)))]
+                         (>!! status-updates-chan [date-bucket "status-service" "heatbeat" "tick" 1])))
+               schedule-pool)
   
   (server/run-server app {:port (Integer/parseInt (:port env))}))
