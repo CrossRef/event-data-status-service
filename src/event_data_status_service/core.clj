@@ -17,7 +17,8 @@
   "
   (:require [clojure.data.json :as json]
             [clojure.core.async :refer [>!! <!! <! chan go-loop]]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [clojure.walk :refer [postwalk]])
   (:require [config.core :refer [env]]
             [liberator.core :as l]
             [compojure.core :as c]
@@ -77,7 +78,9 @@
         updated (update-in structure [service component facet now-date-str] (fnil inc 0))]
     (json/write-str updated)))
 
-; Serve up status page for today, a given date, or a range of dates.
+; Serve up status page for today, a given date, with history.
+; - the days option serves up full calendar days
+; - the hours option serves up full calendar hours
 (l/defresource status-page
   [date-str]
   :available-media-types ["application/javascript"]
@@ -86,34 +89,69 @@
                   (let [date (if date-str
                                (format/parse ymd date-str)
                                (clj-time/now))
-                        days (if-let [days-str (get-in ctx [:request :params "days"])] (Integer/parseInt days-str) 1)]
+                        days (when-let [days-str (get-in ctx [:request :params "days"])] (Integer/parseInt days-str))
+                        hours (when-let [hours-str (get-in ctx [:request :params "hours"])] (Integer/parseInt hours-str))]
                     [false {::date date
-                            ::days days}])
+                            ::days days
+                            ::hours hours}])
                 (catch IllegalArgumentException _ true)))
   
   :exists? (fn [ctx]
              (with-open [conn (get-connection)]
-               (let [date-range (reverse (take (::days ctx) (periodic/periodic-seq (::date ctx) (clj-time/days -1))))
-                     date-str-range (map (partial format/unparse ymd) date-range)
-                     ; Get seq of structures.
-                     days-serialized (map #(.get conn (str day-key-prefix %)) date-str-range)
-                     all-exist? (not-any? empty? days-serialized)]
-                 [all-exist? {::dates date-str-range
-                              ::days-serialized days-serialized}])))
-  
-  :handle-ok (fn [ctx]
-               (let [; days-data is a seq of buckets of complete structure in JSON
-                     days-data (map json/read-str (::days-serialized ctx))
+               (let [days-buckets (cond
+                                    ; If days supplied, take them.
+                                    (::days ctx) (::days ctx)
+                                    
+                                    ; If hours supplied, enough days to cover the hours.
+                                    ; Data is stored in per-day buckets.
+                                    (::hours ctx) (int (Math/ceil (/ (::hours ctx) 24)))
+                                    
+                                    ; Otherwise just take the last day.
+                                    :default 1)
                      
-                     ; because the structures are maps with disjoint keys at the fourth level (service => component => facet => date => count)
-                     ; we just need to utter the magic words "apply merge-with partial merge-with partial merge-with merge".
-                    all-data (apply merge-with (partial merge-with (partial merge-with merge)) days-data)]
-               
+                     ; If hours were supplied, generate a cutoff date for the buckets.
+                     earliest-date (when (::hours ctx)
+                                     (clj-time/minus (clj-time/now)
+                                        (clj-time/hours (::hours ctx))))
+                     
+                     bucket-day-range (reverse (take days-buckets (periodic/periodic-seq (::date ctx) (clj-time/days -1))))
+                     
+                     day-str-range (map (partial format/unparse ymd) bucket-day-range)
+                     
+                     ; Get seq of structures.
+                     days-serialized (map #(.get conn (str day-key-prefix %)) day-str-range)
+                     all-exist? (not-any? empty? days-serialized)
+                     
+                     ; days-data is a seq of buckets of complete structure in JSON
+                     days-data (map json/read-str days-serialized)
+                     
+                     ; Function to filter a map of {date-str count}
+                     date-filter-f (if-not earliest-date
+                                     identity
+                                     (fn [dates]
+                                       (into {}
+                                          (filter (fn [[date-str value]]
+                                                    (clj-time/after? (format/parse ymdhm date-str) earliest-date))
+                                                  dates))))
+                     
+                     ; Because the structures are maps with disjoint keys at the fourth level (service => component => facet => date => count)
+                     ; Merge to three levels deep.
+                     ; At the third level filter dates.
+                     all-data (apply merge-with
+                                     (partial merge-with
+                                              (partial merge-with
+                                                       (fn [a b]
+                                                         ; Sort-map will return the dictionary in order per date.
+                                                         ; Useful for visual appearance of JSON.
+                                                         (into (sorted-map)
+                                                               (merge (date-filter-f a)
+                                                                 (date-filter-f b)))))) days-data)]
+                 [all-exist? {::data all-data}])))
+  
+  :handle-ok (fn [ctx]              
               (json/write-str
                 {:type "event-data-status"
-                 :from (first (::dates ctx))
-                 :to (last (::dates ctx))
-                 :data all-data}))))
+                 :data (::data ctx)})))
 
 ; Accept new data.
 (l/defresource post-status
