@@ -41,6 +41,22 @@
 (def day-key-prefix "__status__day__")
 (def pubsub-key "__status__pubsub__")
 
+(defn filter-at-4-levels
+  "Walk a nested map structure 4 levels deep, apply the key-filter function at the 4th level.
+  Return sorted maps along the way."
+  [s key-value-filter]
+ (into (sorted-map)
+    (map
+      (fn [[k-1 v-1]]
+        [k-1 (into (sorted-map)
+                   (map (fn [[k-2 v-2]]
+                          [k-2 (into (sorted-map)
+                                     (map (fn [[k-3 v-3]]
+                                            [k-3 (into (sorted-map) (filter key-value-filter v-3))])
+                                          v-2))])
+                        v-1))])
+     s)))
+
 ; Redis
 
 (defn make-jedis-pool
@@ -125,28 +141,16 @@
                      ; days-data is a seq of buckets of complete structure in JSON
                      days-data (map json/read-str days-serialized)
                      
-                     ; Function to filter a map of {date-str count}
-                     date-filter-f (if-not earliest-date
-                                     identity
-                                     (fn [dates]
-                                       (into {}
-                                          (filter (fn [[date-str value]]
-                                                    (clj-time/after? (format/parse ymdhm date-str) earliest-date))
-                                                  dates))))
+                     ; because the structures are maps with disjoint keys at the fourth level (service => component => facet => date => count)
+                     ; we just need to utter the magic words "apply merge-with partial merge-with partial merge-with merge".
+                     all-data (apply merge-with (partial merge-with (partial merge-with merge)) days-data)
                      
-                     ; Because the structures are maps with disjoint keys at the fourth level (service => component => facet => date => count)
-                     ; Merge to three levels deep.
-                     ; At the third level filter dates.
-                     all-data (apply merge-with
-                                     (partial merge-with
-                                              (partial merge-with
-                                                       (fn [a b]
-                                                         ; Sort-map will return the dictionary in order per date.
-                                                         ; Useful for visual appearance of JSON.
-                                                         (into (sorted-map)
-                                                               (merge (date-filter-f a)
-                                                                 (date-filter-f b)))))) days-data)]
-                 [all-exist? {::data all-data}])))
+                     ; Filter out dates that we don't want. They're nested at the 4th level.
+                     filtered (filter-at-4-levels all-data (if-not earliest-date
+                                                               (constantly true)
+                                                               (fn [[date-key v]]
+                                                                 (clj-time/after? (format/parse ymdhm date-key) earliest-date))))]
+                 [all-exist? {::data filtered}])))
   
   :handle-ok (fn [ctx]              
               (json/write-str
@@ -203,7 +207,7 @@
   ; Also useful when there is more than once load-balanced instance.
   (at-at/every 60000 (fn []
                        (let [date-bucket (str day-key-prefix (format/unparse ymd (clj-time/now)))]
-                         (>!! status-updates-chan [date-bucket "status-service" "heatbeat" "tick" 1])))
+                         (>!! status-updates-chan [date-bucket "status-service" "heartbeat" "tick" 1])))
                schedule-pool)
   
   (server/run-server app {:port (Integer/parseInt (:port env))}))
