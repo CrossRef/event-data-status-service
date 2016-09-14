@@ -88,11 +88,15 @@
 
 ; Helpers
 (defn update-bucket-data
-  "Update a date bucket. Read JSON, update time, re-serialize."
+  "Update a date bucket. Read JSON, update time, re-serialize.
+  Also maintain the status/activity/total and status/activity/updates counts.
+  "
   [before now-date-str service component facet increment-count]
   (let [structure (json/read-str (or before "{}"))
-        updated (update-in structure [service component facet now-date-str] (fnil inc 0))]
-    (json/write-str updated)))
+        structure (update-in structure [service component facet now-date-str] (fnil #(+ % increment-count) 0))
+        structure (update-in structure ["status-service" "activity" "total" now-date-str] (fnil #(+ % increment-count) 0))
+        structure (update-in structure ["status-service" "activity" "updates" now-date-str] (fnil inc 0))]
+    (json/write-str structure)))
 
 ; Serve up status page for today, a given date, with history.
 ; - the days option serves up full calendar days
@@ -162,6 +166,8 @@
  [service component facet]
  :allowed-methods [:post]
  :available-media-types ["text/plain"]
+ :allowed? (fn [ctx]
+             (:allowed-updates env))
  :authorized? (fn [ctx]
                 (try
                   (@auth-tokens
@@ -193,21 +199,25 @@
 (defn -main
   [& args]
   
-  (log/info "Start Status service")
-  ; Loop over updates and apply them. Because data is stored in a bucket per day, this requires bucket-level locking
-  ; which is achieved by a single goroutine performing the update.
-  (go-loop [[date-bucket service component facet increment-count] (<!! status-updates-chan)]
-    (with-open [connection (get-connection)]
-      (let [before (.get connection date-bucket)
-            updated (update-bucket-data before (format/unparse ymdhm (clj-time/now)) service component facet increment-count)]
-        (.set connection date-bucket updated)))
-      (recur (<! status-updates-chan)))
+  (if (:allowed-updates env)
+    (log/info "Start Status service, updates allowed.")
+    (log/info "Start Status service, read only"))
+  
+  (when (:allowed-updates env)
+    ; Loop over updates and apply them. Because data is stored in a bucket per day, this requires bucket-level locking
+    ; which is achieved by a single goroutine performing the update.
+    (go-loop [[date-bucket service component facet increment-count] (<!! status-updates-chan)]
+      (with-open [connection (get-connection)]
+        (let [before (.get connection date-bucket)
+              updated (update-bucket-data before (format/unparse ymdhm (clj-time/now)) service component facet increment-count)]
+          (.set connection date-bucket updated)))
+        (recur (<! status-updates-chan)))
 
-  ; Keep a timer going to show the evidence service is still up!
-  ; Also useful when there is more than once load-balanced instance.
-  (at-at/every 60000 (fn []
-                       (let [date-bucket (str day-key-prefix (format/unparse ymd (clj-time/now)))]
-                         (>!! status-updates-chan [date-bucket "status-service" "heartbeat" "tick" 1])))
-               schedule-pool)
+    ; Keep a timer going to show the evidence service is still up!
+    ; Also useful when there is more than once load-balanced instance.
+    (at-at/every 60000 (fn []
+                         (let [date-bucket (str day-key-prefix (format/unparse ymd (clj-time/now)))]
+                           (>!! status-updates-chan [date-bucket "status-service" "heartbeat" "tick" 1])))
+                 schedule-pool))
   
   (server/run-server app {:port (Integer/parseInt (:port env))}))

@@ -13,7 +13,7 @@ Status: Under development as of September 2016
  - `:redis-host` e.g. "localhost"
  - `:redis-port` e.g. "6379"
  - `:auth-tokens` e.g. "AUTH1,AUTH2,AUTH3"
-
+ - `:allowed-updates`. Allow updates. Only one server should have this duty. e.g. "true" or nil. 
 
 ## Development
 
