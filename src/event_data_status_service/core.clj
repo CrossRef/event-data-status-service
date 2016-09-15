@@ -16,21 +16,26 @@
   A channel is used to serialize access to the bucket.
   "
   (:require [clojure.data.json :as json]
-            [clojure.core.async :refer [>!! <!! <! chan go-loop]]
+            [clojure.core.async :refer [>!! <!! <! chan go-loop go]]
             [clojure.tools.logging :as log]
             [clojure.walk :refer [postwalk]])
   (:require [config.core :refer [env]]
             [liberator.core :as l]
+            [liberator.representation :as representation]
             [compojure.core :as c]
             [compojure.route :as r]
             [org.httpkit.server :as server]
             [ring.middleware.params :refer [wrap-params]]
+            [ring.middleware.resource :as middleware-resource]
+            [ring.middleware.content-type :as middleware-content-type]
+            [ring.util.response :as resp]
             [clj-time.coerce :as coerce]
             [clj-time.core :as clj-time]
             [clj-time.format :as format]
             [clj-time.periodic :as periodic]
             [overtone.at-at :as at-at])
-  (:import [redis.clients.jedis Jedis JedisPool JedisPoolConfig])
+  (:import [redis.clients.jedis Jedis JedisPool JedisPoolConfig JedisPubSub]
+           [eventdata PubSubClient])
   (:gen-class))
 
 ; Consts
@@ -97,6 +102,40 @@
         structure (update-in structure ["status-service" "activity" "total" now-date-str] (fnil #(+ % increment-count) 0))
         structure (update-in structure ["status-service" "activity" "updates" now-date-str] (fnil inc 0))]
     (json/write-str structure)))
+
+
+; Websocket things
+(def channel-hub (atom {}))
+(def pubsub-channel-name "__status__broadcast")
+
+(defn broadcast
+  "Send event to all websocket listeners."
+  [data]
+    (doseq [[channel channel-options] @channel-hub]
+      (server/send! channel data)))
+      
+(defn socket-handler [request]
+  (log/info "Socket handler")
+  (server/with-channel request channel
+    (server/on-close channel (fn [status]
+                                 (swap! channel-hub dissoc channel)))
+
+    (server/on-receive channel (fn [data]
+                                 ; Any input is a subscribe.
+                                    (swap! channel-hub assoc channel {})))))
+(defn test-handler [request]
+  (server/with-channel request channel
+    (server/on-close channel (fn [status] (println "channel closed: " status)))
+    (server/on-receive channel (fn [data] ;; echo it back
+                          (server/send! channel data)))))
+
+
+
+(defn connect-pubsub []
+  (log/info "Connect pubsub")
+  (let [conn (get-connection)
+        client (new PubSubClient (fn [channel message] (broadcast message)))]
+    (.subscribe conn ^JedisPubSub client (into-array String [pubsub-channel-name]))))
 
 ; Serve up status page for today, a given date, with history.
 ; - the days option serves up full calendar days
@@ -186,12 +225,17 @@
 
 
 (c/defroutes routes
-  (c/GET "/status/:date-str" [date-str] (status-page date-str))
+  (c/GET "/ws" [] test-handler)
+  (c/GET "/socket" [] socket-handler)
+  (c/GET "/status/date/:date-str" [date-str] (status-page date-str))
   (c/GET "/status" [] (status-page nil))
-  (c/POST "/status/:service/:component/:facet" [service component facet] (post-status service component facet)))
-
+  (c/POST "/status/:service/:component/:facet" [service component facet] (post-status service component facet))  
+  (c/GET "/" [] (resp/redirect "http://eventdata.crossref.org")))
+  
 (def app
   (-> routes
+      (middleware-resource/wrap-resource "public")
+      (middleware-content-type/wrap-content-type)
       (wrap-params)))
 
 (def schedule-pool (at-at/mk-pool))
@@ -210,14 +254,19 @@
       (with-open [connection (get-connection)]
         (let [before (.get connection date-bucket)
               updated (update-bucket-data before (format/unparse ymdhm (clj-time/now)) service component facet increment-count)]
-          (.set connection date-bucket updated)))
+          (.set connection date-bucket updated)
+          
+          ; Broadcast via Redis PubSub.
+          (.publish connection pubsub-channel-name (str service "/" component "/" facet ";" increment-count))))
         (recur (<! status-updates-chan)))
-
+    
     ; Keep a timer going to show the evidence service is still up!
     ; Also useful when there is more than once load-balanced instance.
     (at-at/every 60000 (fn []
                          (let [date-bucket (str day-key-prefix (format/unparse ymd (clj-time/now)))]
                            (>!! status-updates-chan [date-bucket "status-service" "heartbeat" "tick" 1])))
                  schedule-pool))
+  
+  (go (connect-pubsub))
   
   (server/run-server app {:port (Integer/parseInt (:port env))}))

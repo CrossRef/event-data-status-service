@@ -1,4 +1,4 @@
-(defproject event-data-status-service "0.1.4"
+(defproject event-data-status-service "0.1.5"
   :description "Status monitoring and reporting for Crossref Event Data"
   :url "http://eventdata.crossref.org"
   :license {:name "The MIT License (MIT)"
@@ -22,6 +22,7 @@
                  [org.apache.logging.log4j/log4j-core "2.6.2"]
                  [org.slf4j/slf4j-simple "1.7.21"]]
   :main ^:skip-aot event-data-status-service.core
+  :java-source-paths ["src-java"]
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}
              :prod {:resource-paths ["config/prod"]}

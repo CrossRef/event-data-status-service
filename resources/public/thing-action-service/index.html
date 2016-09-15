@@ -1,0 +1,140 @@
+<html>
+
+<style>
+div.circle {
+  -moz-border-radius: 20px/20px;
+  -webkit-border-radius: 20px 20px;
+  border-radius: 20px/20px;
+  border:solid 1px #555;
+  width:20px;
+  height:20px;
+  position: absolute;
+  opacity: 0;
+}
+
+@-webkit-keyframes flash {
+    0% {
+      opacity:0;
+    }
+    50% {
+      opacity:1;
+    }
+    100% {
+      opacity:0;
+    }
+}
+
+div.circle-flash {
+  -moz-border-radius: 20px/20px;
+  -webkit-border-radius: 20px 20px;
+  border-radius: 20px/20px;
+  border:solid 1px #555;
+  width:20px;
+  height:20px;
+  position: absolute;
+  -webkit-animation-name: flash;
+  -webkit-animation-duration: 300ms;
+  -webkit-animation-iteration-count: 1;
+}  
+
+</style>
+
+<body>
+</body>
+
+
+<script>
+  function stringHashcode(str) {
+    var hash = 0, i, chr, len;
+    if (str.length === 0) return hash;
+    for (i = 0, len = str.length; i < len; i++) {
+      chr   = str.charCodeAt(i);
+      hash  = ((hash << 5) - hash) + chr;
+      // Truncate to 16 bits
+      hash &= 0xFFFFFF;
+    }
+    return hash;
+  }
+
+
+  var context = new AudioContext();
+  var oscillator = context.createOscillator();
+  var gain = context.createGain();
+  oscillator.type="sine";
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  gain.gain.value = 0;
+  oscillator.start(0);
+  var beepQueue = [];
+  function beep(pitch) {
+    var pitch = beepQueue.shift();
+    if (pitch != undefined) {
+      oscillator.frequency.value = pitch;
+      gain.gain.value = 1;
+      setTimeout(function(){gain.gain.value = 0;}, 100);
+    }
+  }
+
+  setInterval(beep, 200);
+
+  var lowerPitch = 500;
+  var upperPitch = 1500;
+  var pitchRange = upperPitch - lowerPitch;
+
+  var height = document.body.clientHeight;
+  var width = document.body.clientWidth;
+
+  var url = "ws://" + window.location.host + "/socket";
+  var socket = new WebSocket(url);
+
+  function getCircle(path) {
+    var circle = document.getElementById(path);
+
+    if (circle == null) {
+      var pathParts = path.split("/");
+      // put three components of path in 3d space [0..1].
+      var x = stringHashcode(pathParts[0]) / 0xFFFFFF;
+      var y = stringHashcode(pathParts[1]) / 0xFFFFFF;
+      var z = stringHashcode(path);
+      
+      var pitch = ((stringHashcode(path) / 0xFFFFFF) * pitchRange) + lowerPitch;
+
+      var red = z & 0x0000FF;
+      var green = (z & 0x00FF00) >> 8;
+      var blue = (z & 0xFF0000) >> 16;
+
+      circle = document.createElement("div");
+      circle.id = path;
+      circle.style.left = x * width;
+      circle.style.top = y * height;
+      circle.style.backgroundColor = "rgb(" + red + ", " + green + ", " + blue + ")";
+      document.body.appendChild(circle);
+    }
+
+    document.body.removeChild(circle);
+    document.body.appendChild(circle);
+    circle.className = "circle-flash";
+
+    beepQueue.push(pitch);
+
+    return circle;
+  }
+
+  socket.onopen = function() {
+    socket.send("start");
+  }
+
+  socket.onmessage = function(item) {
+
+    var parts = item.data.split(";");
+    var path = parts[0];
+    var count = parseInt(parts[1]);
+
+    var circle = getCircle(path);
+  };
+
+  socket.onerror = function() {
+    console.log("error");
+  }
+</script>
+</html>
