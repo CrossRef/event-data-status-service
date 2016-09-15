@@ -1,6 +1,11 @@
 <html>
 
 <style>
+body {
+  font-family: monospace;  
+}
+
+
 div.circle {
   -moz-border-radius: 20px/20px;
   -webkit-border-radius: 20px 20px;
@@ -56,6 +61,12 @@ div.circle-flash {
     return hash;
   }
 
+  var colourRangeLow = 150;
+  var colourRangeHigh = 250;
+  var colourRange = colourRangeHigh - colourRangeLow;
+  function clampColourRange(value) {
+    return Math.floor((value / 256) * colourRange + colourRangeLow);
+  }
 
   var context = new AudioContext();
   var oscillator = context.createOscillator();
@@ -66,16 +77,58 @@ div.circle-flash {
   gain.gain.value = 0;
   oscillator.start(0);
   var beepQueue = [];
-  function beep(pitch) {
-    var pitch = beepQueue.shift();
-    if (pitch != undefined) {
-      oscillator.frequency.value = pitch;
-      gain.gain.value = 1;
-      setTimeout(function(){gain.gain.value = 0;}, 100);
+  
+
+  function flashCircle(path) {
+    var circle = document.getElementById(path);
+
+    if (circle != null) {
+      document.body.removeChild(circle);
+    }
+
+    var pathParts = path.split("/");
+    // put three components of path in 3d space [0..1].
+    var x = stringHashcode(pathParts[0]) / 0xFFFFFF;
+    var y = stringHashcode(pathParts[1]) / 0xFFFFFF;
+    var z = stringHashcode(path);
+    
+    var red = clampColourRange(z & 0x0000FF);
+    var green = clampColourRange((z & 0x00FF00) >> 8);
+    var blue = clampColourRange((z & 0xFF0000) >> 16);
+
+    circle = document.createElement("div");
+    circle.id = path;
+    circle.innerHTML = "<span>" + pathParts[0] + "<br>" + pathParts[1] + "<br>" + pathParts[2] + "</span>"
+    circle.style.left = x * width;
+    circle.style.top = y * height;
+    circle.style.backgroundColor = "rgb(" + red + ", " + green + ", " + blue + ")";
+    document.body.appendChild(circle);
+     
+    document.body.appendChild(circle);
+    circle.className = "circle-flash";
+
+    setTimeout(function(){ document.body.removeChild(circle); }, 1000);
+  }
+
+  function beep(path) {
+    var pitch = ((stringHashcode(path) / 0xFFFFFF) * pitchRange) + lowerPitch;
+    oscillator.frequency.setValueAtTime(pitch,0);
+    gain.gain.setValueAtTime(1,0);
+    setTimeout(function(){ gain.gain.value = 0; }, 100);
+  }
+
+  function serveQueue() {
+    var item = beepQueue.shift();
+    if (item != undefined) {
+      var parts = item.split(";");
+      var path = parts[0];
+      var count = parseInt(parts[1]);
+      beep(path);
+      flashCircle(path);
     }
   }
 
-  setInterval(beep, 200);
+  setInterval(serveQueue, 200);
 
   var lowerPitch = 500;
   var upperPitch = 1500;
@@ -87,50 +140,13 @@ div.circle-flash {
   var url = "ws://" + window.location.host + "/socket";
   var socket = new WebSocket(url);
 
-  function getCircle(path) {
-    var circle = document.getElementById(path);
-
-    if (circle == null) {
-      var pathParts = path.split("/");
-      // put three components of path in 3d space [0..1].
-      var x = stringHashcode(pathParts[0]) / 0xFFFFFF;
-      var y = stringHashcode(pathParts[1]) / 0xFFFFFF;
-      var z = stringHashcode(path);
-      
-      var pitch = ((stringHashcode(path) / 0xFFFFFF) * pitchRange) + lowerPitch;
-
-      var red = z & 0x0000FF;
-      var green = (z & 0x00FF00) >> 8;
-      var blue = (z & 0xFF0000) >> 16;
-
-      circle = document.createElement("div");
-      circle.id = path;
-      circle.style.left = x * width;
-      circle.style.top = y * height;
-      circle.style.backgroundColor = "rgb(" + red + ", " + green + ", " + blue + ")";
-      document.body.appendChild(circle);
-    }
-
-    document.body.removeChild(circle);
-    document.body.appendChild(circle);
-    circle.className = "circle-flash";
-
-    beepQueue.push(pitch);
-
-    return circle;
-  }
 
   socket.onopen = function() {
     socket.send("start");
   }
 
   socket.onmessage = function(item) {
-
-    var parts = item.data.split(";");
-    var path = parts[0];
-    var count = parseInt(parts[1]);
-
-    var circle = getCircle(path);
+    beepQueue.push(item.data);
   };
 
   socket.onerror = function() {
