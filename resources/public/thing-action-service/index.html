@@ -6,22 +6,38 @@ body {
 }
 
 
-div.circle {
+div.circle-flash {
+  position: absolute;
+}
+
+div.round  {
+  z-index: -2;
+}
+
+span.caption  {
+  position: relative;
+  z-index: -1;
+  left: 30px;
+}
+
+
+div.round {
   -moz-border-radius: 20px/20px;
   -webkit-border-radius: 20px 20px;
   border-radius: 20px/20px;
   border:solid 1px #555;
-  width:20px;
-  height:20px;
+  /*width:20px;*/
+  /*height:20px;*/
   position: absolute;
-  opacity: 0;
+  padding: 5px;
 }
+
 
 @-webkit-keyframes flash {
     0% {
       opacity:0;
     }
-    50% {
+    2% {
       opacity:1;
     }
     100% {
@@ -30,15 +46,8 @@ div.circle {
 }
 
 div.circle-flash {
-  -moz-border-radius: 20px/20px;
-  -webkit-border-radius: 20px 20px;
-  border-radius: 20px/20px;
-  border:solid 1px #555;
-  width:20px;
-  height:20px;
-  position: absolute;
   -webkit-animation-name: flash;
-  -webkit-animation-duration: 300ms;
+  -webkit-animation-duration: 10000ms;
   -webkit-animation-iteration-count: 1;
 }  
 
@@ -54,7 +63,7 @@ div.circle-flash {
     if (str.length === 0) return hash;
     for (i = 0, len = str.length; i < len; i++) {
       chr   = str.charCodeAt(i);
-      hash  = ((hash << 5) - hash) + chr;
+      hash  = ((hash << 5) - hash) + (chr ^ 2);
       // Truncate to 16 bits
       hash &= 0xFFFFFF;
     }
@@ -79,18 +88,20 @@ div.circle-flash {
   var beepQueue = [];
   
 
-  function flashCircle(path) {
+  function flashCircle(path, count) {
     var circle = document.getElementById(path);
 
     if (circle != null) {
+      console.log("need to remove")
       document.body.removeChild(circle);
     }
 
     var pathParts = path.split("/");
     // put three components of path in 3d space [0..1].
     var x = stringHashcode(pathParts[0]) / 0xFFFFFF;
-    var y = stringHashcode(pathParts[1]) / 0xFFFFFF;
+    var y = stringHashcode(pathParts[1] + pathParts[2]) / 0xFFFFFF;
     var z = stringHashcode(path);
+
     
     var red = clampColourRange(z & 0x0000FF);
     var green = clampColourRange((z & 0x00FF00) >> 8);
@@ -98,22 +109,23 @@ div.circle-flash {
 
     circle = document.createElement("div");
     circle.id = path;
-    circle.innerHTML = "<span>" + pathParts[0] + "<br>" + pathParts[1] + "<br>" + pathParts[2] + "</span>"
-    circle.style.left = x * width;
-    circle.style.top = y * height;
-    circle.style.backgroundColor = "rgb(" + red + ", " + green + ", " + blue + ")";
-    document.body.appendChild(circle);
-     
-    document.body.appendChild(circle);
+    circle.innerHTML = "<div class='round'>" + count + "</div><span class='caption'>" + pathParts[0] + " &rarr; " + pathParts[1] + " &rarr; " + pathParts[2] + "</span>"
+    var round = circle.getElementsByClassName("round")[0];
+    circle.style.left = (x * width) + margin;
+    circle.style.top = (y * height) + margin;
+
+        console.log(path, circle.style.left, circle.style.top)
+
+    round.style.backgroundColor = "rgb(" + red + ", " + green + ", " + blue + ")";
     circle.className = "circle-flash";
 
-    setTimeout(function(){ document.body.removeChild(circle); }, 1000);
+    document.body.appendChild(circle);
   }
 
-  function beep(path) {
+  function beep(path, count) {
     var pitch = ((stringHashcode(path) / 0xFFFFFF) * pitchRange) + lowerPitch;
     oscillator.frequency.setValueAtTime(pitch,0);
-    gain.gain.setValueAtTime(1,0);
+    gain.gain.value = 1;
     setTimeout(function(){ gain.gain.value = 0; }, 100);
   }
 
@@ -123,8 +135,9 @@ div.circle-flash {
       var parts = item.split(";");
       var path = parts[0];
       var count = parseInt(parts[1]);
-      beep(path);
-      flashCircle(path);
+      beep(path, count);
+      flashCircle(path, count);
+
     }
   }
 
@@ -134,8 +147,9 @@ div.circle-flash {
   var upperPitch = 1500;
   var pitchRange = upperPitch - lowerPitch;
 
-  var height = document.body.clientHeight;
-  var width = document.body.clientWidth;
+  var margin = 100;
+  var height = document.body.clientHeight - margin * 2;
+  var width = document.body.clientWidth - margin * 2;
 
   var url = "ws://" + window.location.host + "/socket";
   var socket = new WebSocket(url);
