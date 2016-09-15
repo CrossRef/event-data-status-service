@@ -1,4 +1,4 @@
-(defproject event-data-status-service "0.1.7"
+(defproject event-data-status-service "0.1.8"
   :description "Status monitoring and reporting for Crossref Event Data"
   :url "http://eventdata.crossref.org"
   :license {:name "The MIT License (MIT)"
@@ -24,6 +24,7 @@
   :main ^:skip-aot event-data-status-service.core
   :java-source-paths ["src-java"]
   :target-path "target/%s"
+  :jvm-opts ["-Duser.timezone=UTC"]
   :profiles {:uberjar {:aot :all}
              :prod {:resource-paths ["config/prod"]}
              :dev  {:resource-paths ["config/dev"]}})
