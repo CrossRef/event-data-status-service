@@ -5,55 +5,67 @@ body {
   font-family: monospace;  
 }
 
-
-div.circle-flash {
-  position: absolute;
+.cell {
+    margin-top: 20px;
 }
-
-div.round  {
-  z-index: -2;
-}
-
-span.caption  {
-  position: relative;
-  z-index: -1;
-  left: 30px;
-}
-
 
 div.round {
+  right: 5px
   -moz-border-radius: 20px/20px;
   -webkit-border-radius: 20px 20px;
   border-radius: 20px/20px;
   border:solid 1px #555;
-  /*width:20px;*/
-  /*height:20px;*/
-  position: absolute;
   padding: 5px;
+  display: inline-block;
+  opacity: 0;
 }
-
 
 @-webkit-keyframes flash {
     0% {
       opacity:0;
+      transform: translate(0px, 0px);
     }
-    2% {
+    5% {
       opacity:1;
+      transform: translate(0px, -5px) scale(1.1);
+    }
+    20% {
+      opacity:1;
+      transform: translate(0px, 0px) scale(1); 
     }
     100% {
       opacity:0;
+      transform: translate(0px, 0px);
     }
 }
 
-div.circle-flash {
-  -webkit-animation-name: flash;
-  -webkit-animation-duration: 10000ms;
-  -webkit-animation-iteration-count: 1;
-}  
+table {
+  width: 100%;
+}
+
+th {
+  text-align: left;
+}
+
+div.row {
+  margin-top: 20px;
+}
+
+p.heading {
+  font-weight: bold;
+}
 
 </style>
 
 <body>
+<div class="circle-flash">yes?</div>
+
+<table>
+  <tr id="headings">
+  </tr>
+  <tr id="events">
+  </tr>
+</table>
 </body>
 
 
@@ -87,39 +99,73 @@ div.circle-flash {
   oscillator.start(0);
   var beepQueue = [];
   
+  var events = document.getElementById("events");
+  var headings = document.getElementById("headings");
 
-  function flashCircle(path, count) {
-    var circle = document.getElementById(path);
+  // Mapping of first element to <row>.
+  var cols = {};
 
-    if (circle != null) {
-      console.log("need to remove")
-      document.body.removeChild(circle);
+  function getCol(name) {
+    var col = cols[name];
+    
+    if (col) {
+      return cols[name];
     }
 
-    var pathParts = path.split("/");
-    // put three components of path in 3d space [0..1].
-    var x = stringHashcode(pathParts[0]) / 0xFFFFFF;
-    var y = stringHashcode(pathParts[1] + pathParts[2]) / 0xFFFFFF;
-    var z = stringHashcode(path);
+    var heading = document.createElement("th");
+    heading.innerHTML = name;
+    headings.appendChild(heading);
 
-    
+    col = document.createElement("td");
+    cols[name] = col;
+    events.appendChild(col);
+    return col;
+  }
+
+  function getCell(path) {
+    var cellId = path[0] + "-" + path[1] + "-" + path[2];
+    var cell = document.getElementById(cellId);
+    if (cell) {
+      return cell;
+    }
+
+    var col = getCol(path[0]);
+    var rowId = path[0] + "-" + path[1];
+    var row = document.getElementById(rowId);
+
+    if (!row) {
+      row = document.createElement("div")
+      row.innerHTML = "<p class='heading'>" + path[1] + "</p>"
+      row.className = "row";
+      row.id = rowId;
+      col.appendChild(row);
+    }
+
+    cell = document.createElement("div");
+    cell.id = cellId;
+    cell.innerHTML = "<div class='round circle-flash'></div><span class='caption'>" + path[2] + "</span>"
+    cell.className = "cell"
+    row.appendChild(cell);
+
+    return cell;
+  }
+
+  function flashCircle(pathString, count) {
+    var path = pathString.split("/");
+    var cell = getCell(path);
+    var round = cell.getElementsByClassName('round')[0];
+    round.className = "round";
+    round.innerHTML = count;
+    round.style.animation = "";
+    window.setTimeout(function(){round.style.animation = "flash 2s ease-out 1";}, 10);
+    console.log(pathString)
+
+
+    var z = stringHashcode(pathString);
     var red = clampColourRange(z & 0x0000FF);
     var green = clampColourRange((z & 0x00FF00) >> 8);
     var blue = clampColourRange((z & 0xFF0000) >> 16);
-
-    circle = document.createElement("div");
-    circle.id = path;
-    circle.innerHTML = "<div class='round'>" + count + "</div><span class='caption'>" + pathParts[0] + " &rarr; " + pathParts[1] + " &rarr; " + pathParts[2] + "</span>"
-    var round = circle.getElementsByClassName("round")[0];
-    circle.style.left = (x * width) + margin;
-    circle.style.top = (y * height) + margin;
-
-        console.log(path, circle.style.left, circle.style.top)
-
     round.style.backgroundColor = "rgb(" + red + ", " + green + ", " + blue + ")";
-    circle.className = "circle-flash";
-
-    document.body.appendChild(circle);
   }
 
   function beep(path, count) {
@@ -152,6 +198,7 @@ div.circle-flash {
   var width = document.body.clientWidth - margin * 2;
 
   var url = "ws://" + window.location.host + "/socket";
+  // var url = "ws://status.eventdata.crossref.org/socket";
   var socket = new WebSocket(url);
 
 
