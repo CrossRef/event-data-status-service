@@ -1,18 +1,13 @@
-window.input = {
-  columns:
-  [
-    [{id: 'a1', caption: "A1"}, {id: 'a2', caption: "A2"}, {id: 'a3', caption: "A3"}],
-    [{id: 'b1', caption: "B1"}, {id: 'b2', caption: "B2"}, {id: 'b3', caption: "B3"}],
-    [{id: 'c1', caption: "C1"}, {id: 'c2', caption: "C2"}, {id: 'c3', caption: "C3"}]
-  ],
-  connections: [
-    {from: "a2", to: "b2", trigger: "a2-b2", id: "a2-b2", reverse: false},
-    {from: "b2", to: "c2", trigger: "b2-c2", id: "b2-c2", reverse: false},
-    {from: "a1", to: "b2", trigger: "a1-b2", id: "a1-b2", reverse: false},
-    {from: "a3", to: "b2", trigger: "a3-b2", id: "a3-b2", reverse: false}
-  ]
-  
-}
+RED = "#ef3340";
+BLUE = "##3eb1c8";
+LIGHT = "#d8d2c4";
+YELLOW = "#";
+DARK = "#4f5858";
+
+// Colours for various transition modes.
+MODE_NORMAL = "#ffc72c";
+MODE_OK = "#33ef40";
+MODE_ERROR = "#ef3340";
 
 window.input = {
   columns:
@@ -20,36 +15,73 @@ window.input = {
     // External stuff
     [
      {
-        id: "gnip",
-        caption: "Gnip"
+        id: "twitter",
+        caption: "Twitter.com"
+      },
+      {
+        id: "blogs",
+        caption: "Blogs"
+      },
+      {
+        id: "newsfeeds",
+        caption: "Newsfeeds"
       },
       {
         id: "wikipedia",
-        caption: "Wikipedia"
+        caption: "Wikipedia.org"
+      },
+      {
+        id: "reddit",
+        caption: "Reddit.com"
       }
+
     ],
     // Agents
     [
       {
         id: "twitter-agent",
-        caption: "Twitter Agent"
+        caption: "Twitter Agent",
+        actions: [{trigger: "twitter-agent/input/process-stream-event",
+                   caption: "process", colour: MODE_NORMAL},
+                  {trigger: "twitter-agent/ingest/heartbeat",
+                   caption: "heartbeat", colour: MODE_NORMAL},
+                  {trigger: "twitter-agent/process/found-dois",
+                   caption: "found DOI", colour: MODE_OK},
+                   ]
+       // ignore twitter-agent/input/report-queue-sizes
+       // twitter-agent/input/input-queue
       },
       {
         id: "newsfeed-agent",
         caption: "Newsfeed Agent",
-        functions: [{trigger: "newsfeed-agent/feed/analyze-item",
-                     caption: "analyze-item"},
+        actions: [{trigger: "newsfeed-agent/feed/analyze-item",
+                     caption: "analyze-item", colour: MODE_NORMAL},
                     {trigger: "newsfeed-agent/feed/found-item",
-                     caption: "found-item"},
+                     caption: "found-item", colour: MODE_OK},
                     {trigger: "newsfeed-agent/feed/heartbeat",
-                     caption: "heartbeat"},
+                     caption: "heartbeat", colour: MODE_NORMAL},
                     {trigger: "newsfeed-agent/feed/check-all-newsfeeds",
-                     caption: "check-all-newsfeeds"},
-                    ]
+                     caption: "check-all-newsfeeds", colour: MODE_NORMAL},
+                    {trigger: "newsfeed-agent/ingest/heartbeat",
+                     caption: "ingest heartbeat", colour: MODE_NORMAL}]
       },
       {
         id: "wikipedia-agent",
-        caption: "Wikipedia Agent"
+        caption: "Wikipedia Agent",
+        actions: [// scalar
+                  //{trigger: "wikipedia-agent/process/input-queue",
+                  // caption: "input", colour: MODE_NORMAL},
+                  {trigger: "wikipedia-agent/process/process-input",
+                   caption: "process", colour: MODE_NORMAL},
+                  {trigger: "wikipedia-agent/ingest/heartbeat", caption: "heartbeat", colour: MODE_NORMAL},
+                  {trigger: "wikipedia-agent/input/found-doi-removed", caption: "DOI Removed", colour: MODE_ERROR},
+                  {trigger: "wikipedia-agent/input/found-doi-added", caption: "DOI Removed", colour: MODE_OK}]
+        // scalar: wikipedia-agent/input/queue-sizes
+      },
+      {
+        id: "reddit-agent",
+        caption: "Reddit Agent",
+        actions: [{"trigger": "reddit-agent/ingest/heartbeat", caption: "heartbeat", colour: MODE_NORMAL}]
       }
     ],
     // Internal processing
@@ -57,20 +89,21 @@ window.input = {
       {
         id: "evidence-service",
         caption: "Evidence Service",
-        functions: [{trigger: "evidence-service/api/get-artifact-current",
-                     caption: "get-artifact-current"},
+        actions: [{trigger: "evidence-service/api/get-artifact-current",
+                     caption: "get-artifact-current", colour: MODE_NORMAL},
                     {trigger: "evidence-service/api/get-artifact-version",
-                     caption: "get-artifact-version"},
+                     caption: "get-artifact-version", colour: MODE_NORMAL},
                     {trigger: "evidence-service/api/get-artifact-versions",
-                     caption: "get-artifact-versions"},
+                     caption: "get-artifact-versions", colour: MODE_NORMAL},
                     {trigger: "evidence-service/api/get-event-evidence",
-                     caption: "get-artifact-version"},
+                     caption: "get-artifact-version", colour: MODE_NORMAL},
                     {trigger: "get-event-evidence/api/get-list-all",
-                     caption: "get-list-all"},
+                     caption: "get-list-all", colour: MODE_NORMAL},
                     {trigger: "evidence-service/api/receive-evidence",
-                     caption: "receive-evidence"},
+                     caption: "receive-evidence", colour: MODE_NORMAL},
                     {trigger: "evidence-service/server/heartbeat",
-                     caption: "heartbeat"}]
+                     caption: "heartbeat", colour: MODE_NORMAL}
+                     ]
       }
 
     ],
@@ -82,38 +115,56 @@ window.input = {
       },
       {
         id: "status-service",
-        caption: "Status Service"
-      }
+        caption: "Status Service",
+        actions: [{trigger: "status-service/heartbeat/tick", caption: "heartbeat", colour: MODE_NORMAL}]
+      },
+      {
+        id: "archive",
+        caption: "Archive"
+      },
+       
     ]
   ],
-  connections : [
-    {from: "evidence-service", to: "lagotto", trigger: "evidence-service/deposits/send-deposit", id: "evidence-service/deposits/send-deposit", reverse: false},
-    {from: "evidence-service", to: "lagotto", trigger: "evidence-service/deposits/send-deposit-ok", id: "evidence-service/deposits/send-deposit-ok", reverse: true},
-    {from: "wikipedia", to: "wikipedia-agent", trigger: "wikipedia-agent/restbase-input/query", id: "wikipedia-agent/restbase-input/query", reverse: true},
-    {from: "wikipedia", to: "wikipedia-agent", trigger: "wikipedia-agent/restbase-input/error", id: "wikipedia-agent/restbase-input/error", reverse: false},
-    {from: "wikipedia", to: "wikipedia-agent", trigger: "wikipedia-agent/restbase-input/ok", id: "wikipedia-agent/restbase-input/ok", reverse: false},
-    {from: "wikipedia", to: "wikipedia-agent", trigger: "wikipedia-agent/input/recent-changes-input", id: "wikipedia-agent/input/recent-changes-input", reverse: false},
-    {from: "wikipedia-agent", to: "evidence-service", trigger: "wikipedia-agent/evidence/sent", id: "wikipedia-agent/evidence/sent", reverse: false},
-    {from: "wikipedia-agent", to: "evidence-service", trigger: "wikipedia-agent/evidence/sent-ok", id: "wikipedia-agent/evidence/sent-ok", reverse: false},
-    {from: "twitter-agent", to: "evidence-service", trigger: "twitter-agent/artifact/fetch", id: "twitter-agent/artifact/fetch", reverse: true},
-    {from: "twitter-agent", to: "evidence-service", trigger: "twitter-agent/evidence/sent", id: "twitter-agent/evidence/sent", reverse: false},
-    {from: "twitter-agent", to: "evidence-service", trigger: "twitter-agent/evidence/sent-ok", id: "twitter-agent/evidence/sent-ok", reverse: false},
-    {from: "newsfeed-agent", to: "evidence-service", trigger: "newsfeed-agent/artifact/fetch", id: "newsfeed-agent/artifact/fetch", reverse: true},
-    {from: "newsfeed-agent", to: "evidence-service", trigger: "newsfeed-agent/evidence-sent", id: "newsfeed-agent/evidence-sent", reverse: false},
-    {from: "newsfeed-agent", to: "evidence-service", trigger: "newsfeed-agent/evidence-sent-ok", id: "newsfeed-agent/evidence-sent-ok", reverse: false},
-    
-    // {from: "", to: "", trigger: "", reverse: false},
-    // {from: "", to: "", trigger: "", reverse: false},
-    // {from: "", to: "", trigger: "", reverse: false},
-    // {from: "", to: "", trigger: "", reverse: false},
+  // trigger => info
+  connections : {
+   "evidence-service/deposits/send-deposit": {from: "evidence-service", to: "lagotto", reverse: false, colour: MODE_NORMAL, caption: "deposit"},
+   "evidence-service/deposits/send-deposit-ok": {from: "evidence-service", to: "lagotto" , reverse: true, colour: MODE_OK, caption: "deposit"},
+   "evidence-service/deposits/send-evidence": {from: "evidence-service", to: "archive", reverse: false, colour: MODE_NORMAL, caption: "archive evidence"},
+   "evidence-service/deposits/send-evidence-success": {from: "evidence-service", to: "archive", reverse: true, colour: MODE_OK, caption: "archive evidence"},
+   "evidence-service/deposits/send-evidence-failure": {from: "evidence-service", to: "archive", reverse: true, colour: MODE_ERROR, caption: "archive evidence"},
+   
+   "wikipedia-agent/restbase-input/query": {from: "wikipedia", to: "wikipedia-agent", reverse: true, colour: MODE_NORMAL, caption: "RESTBase"},
+   "wikipedia-agent/restbase-input/error": {from: "wikipedia", to: "wikipedia-agent", reverse: false, colour: MODE_ERROR, caption: "RESTBase"},
+   "wikipedia-agent/restbase-input/ok": {from: "wikipedia", to: "wikipedia-agent", reverse: false, colour: MODE_OK, caption: "RESTBase"},
+   "wikipedia-agent/input/recent-changes-input": {from: "wikipedia", to: "wikipedia-agent", reverse: false, colour: MODE_NORMAL, caption: "RCStream"},
+   "wikipedia-agent/evidence/sent": {from: "wikipedia-agent", to: "evidence-service", reverse: false, colour: MODE_OK, caption: "evidence"},
+   "wikipedia-agent/evidence/sent-ok": {from: "wikipedia-agent", to: "evidence-service", reverse: true, colour: MODE_OK, caption: "evidence"},
+   "wikipedia-agent/evidence/sent-error": {from: "wikipedia-agent", to: "evidence-service", reverse: true, colour: MODE_ERROR, caption: "evidence"},
 
+   "twitter-agent/artifact/fetch": {from: "twitter-agent", to: "evidence-service", reverse: true, colour: MODE_NORMAL, caption: "artifact"},
+   "twitter-agent/evidence/sent": {from: "twitter-agent", to: "evidence-service", reverse: false, colour: MODE_NORMAL, caption: "evidence"},
+   "twitter-agent/evidence/sent-ok": {from: "twitter-agent", to: "evidence-service", reverse: true, colour: MODE_OK, caption: "evidence"},
+   "twitter-agent/evidence/sent-error": {from: "twitter-agent", to: "evidence-service", reverse: true, colour: MODE_ERROR, caption: "evidence"},
+   "twitter-agent/input/input-stream-event": {from: "twitter", to: "twitter-agent", reverse: false, colour: MODE_NORMAL, caption: "tweet"},
 
-  ]
+   "newsfeed-agent/artifact/fetch": {from: "newsfeed-agent", to: "evidence-service", reverse: true, colour: MODE_NORMAL, caption: "artifact"},
+   "newsfeed-agent/evidence/sent": {from: "newsfeed-agent", to: "evidence-service", reverse: false, colour: MODE_NORMAL, caption: "evidence"},
+   "newsfeed-agent/evidence/sent-ok": {from: "newsfeed-agent", to: "evidence-service", reverse: true, colour: MODE_OK, caption: "evidence"},
+   "newsfeed-agent/evidence/sent-error": {from: "newsfeed-agent", to: "evidence-service", reverse: true, colour: MODE_ERROR, caption: "evidence"},
+
+   "reddit-agent/evidence/sent": {from: "reddit-agent", to: "evidence-service", reverse: true, colour: MODE_NORMAL, caption: "artifact"},
+   "reddit-agent/evidence/sent-ok": {from: "reddit-agent", to: "evidence-service", reverse: true, colour: MODE_OK, caption: "artifact"},
+   "reddit-agent/evidence/sent-error": {from: "reddit-agent", to: "evidence-service", reverse: true, colour: MODE_ERROR, caption: "artifact"},
+   "reddit-agent/reddit/fetch-page": {from: "reddit", to: "reddit-agent", reverse: true, colour: MODE_NORMAL, caption: "fetch"},
+   "reddit-agent/reddit/authenticate": {from: "reddit", to: "reddit-agent", reverse: true, colour: MODE_NORMAL, caption: "authenticate"}
+
+  }
 };
 
+// All values in 'pixels'.
 window.config = {
-  columnWidth: 120,
-  columnPadding: 100,
+  columnWidth: 250,
+  columnPadding: 50,
 
   boxHeight: 80,
   boxPaddingTop: 20,
@@ -123,184 +174,356 @@ window.config = {
   boxMarginBottom: 20,
 
 
-  paddingLeft: 50,
-  paddingTop: 50,
+  paddingLeft: 20,
+  paddingTop: 0,
 
-  boxCaptionTextHeight: 10,
+  boxCaptionTextHeight: 20,
   boxCaptionTextPaddingTop: 8,
-  boxCaptionTextPaddingLeft: 8,
+  boxCaptionTextPaddingLeft: 15,
   boxCaptionTextPaddingBottom: 10,
 
-  functionCaptionTextHeight: 10,
-  functionCaptionTextPaddingTop: 8,
-  functionCaptionTextPaddingLeft: 8,
+  actionCaptionTextHeight: 15,
+  actionCaptionTextPaddingTop: 8,
+  actionCaptionTextPaddingLeft: 8,
 
-  connectionSpacing: 10
+  connectionSpacing: 10,
+  ballSize: 10,
+  ballAnnotationTextHeight: 15,
 
+  actionBallSize: 10
 };
+
+// 2 on retina, 1 normal.
+var ratio = window.devicePixelRatio;
 
 var canvas = document.getElementById("canvas");
 var header = document.getElementById("header");
 var context = canvas.getContext("2d");
-canvas.width = document.body.clientWidth;
-canvas.height = document.body.clientHeight - header.clientHeight;
+var width = (document.body.clientWidth);
+var height = (document.body.clientHeight - header.clientHeight);
 
-// Transitions.
+context.scale(ratio,ratio);
+canvas.width = width * ratio;
+canvas.height = height * ratio;
+canvas.style.width = width + "px";
+canvas.style.height = height + "px";
 
-// connection id => transition progress as float.
-var transitions = {};
-
-// connection id => integer number of queued transitions.
-var transitionQueue = {};
-
-function tickTransitions() {
-  for (let connection of input.connections) {
-    // Tick all transitions.
-    if (transitions[connection.id] != undefined) {
-      transitions[connection.id] += 0.02;
-    }
-
-    // Finish those that are over.
-    if (transitions[connection.id] > 1) {
-      transitions[connection.id] = undefined;
-    }
-
-    // Cue transitions from the queue if the transition has finished.
-    // Undefined not > 0.
-    if (transitions[connection.id] == undefined && transitionQueue[connection.id] > 0) {
-      transitions[connection.id] = 0;
-      transitionQueue[connection.id] --;
-    }
+// Scale all config values;
+for (var key in window.config) {
+  if (window.config.hasOwnProperty(key)) {
+    window.config[key] *= ratio;
   }
 }
 
-function findBox(id) {
+
+// There can be one transition per action / connection. 
+// Represent float status [0,1] of transition.
+var actionTransitions = {};
+var connectionTransitions = {};
+
+// Queue per action / connection. Number of events in the queue.
+var actionTransitionQueue = {};
+var connectionTransitionQueue = {};
+
+
+// Return entities keyed by triggers.
+// Will later hold layout information.
+function buildEntities(inputData) {
+  var entities = {
+    // connection trigger => info
+    connections : {},
+
+    // component id => component
+    components: {},
+
+    // action trigger => info
+    actions: {}
+  };
+
+  // Index box by id and actions by triggers.
   for (let stage of window.input.columns) {
     for (let column of stage) {
-      for (let box of stage) {
-        if (box.id == id) {
-          return box;
+      for (let component of stage) {
+        // Assign used here for only 1-deep copying.
+        entities.components[component.id] = Object.assign(component);
+
+        for (let action of component.actions || []) {
+          entities.actions[action.trigger] = Object.assign(action);
         }
       }
     }
   }
+
+  for (let trigger in window.input.connections) {
+    if (window.input.connections.hasOwnProperty(trigger)) {
+      entities.connections[trigger] = Object.assign(window.input.connections[trigger]);
+    }
+  }
+
+  return entities;
 }
 
 // Assign connections to boxes.
-function connectAll() {
+// Takes input config and mutable 'entities' object. Modify 'entities' in-place.
+function connectAll(inputData, entities) {
   console.log("Layout");
-  for (let connection of window.input.connections) {
-    
-    var from = findBox(connection.from);
-    var to = findBox(connection.to);
-    console.log("Layout connection", connection, "from", from, "to", to);
-    from.outboundConnections = (from.outboundConnections || 0) + 1;
-    to.inboundConnections = (to.inboundConnections || 0) + 1;
+  for (let trigger in inputData.connections) {
+    if (inputData.connections.hasOwnProperty(trigger)) {
+      var connection = inputData.connections[trigger];
 
-    connection.fromConnectionI = from.outboundConnections;
-    connection.toConnectionI = to.inboundConnections;
+      var from = entities.components[connection.from];
+      var to = entities.components[connection.to];
+      // console.log("Layout connection", connection, "from", from, "to", to);
+      from.outboundConnections = (from.outboundConnections || 0) + 1;
+      to.inboundConnections = (to.inboundConnections || 0) + 1;
+  
+      connection.fromConnectionI = from.outboundConnections;
+      connection.toConnectionI = to.inboundConnections;
+    }
   }
 }
 
 // Give co-ordinates to everything.
-function layoutAll() {
-  // Boxes.
+// Take input data structure and mutate 'entities' in place.
+function layoutAll(inputData, entities) {
+  // Boxes and their actions.
   var columnX = config.paddingLeft;
   for (let column of input.columns) {
     var boxY = config.paddingTop;
     for (let box of column) {
-      box.x = columnX;
-      box.y = boxY;
-      box.width = config.columnWidth;
-      box.height = config.boxPaddingTop + config.boxPaddingBottom +
+      // The mutable object for this box.
+      var b = entities.components[box.id];
+
+      b.x = columnX;
+      b.y = boxY;
+      b.width = config.columnWidth;
+      b.height = config.boxPaddingTop + config.boxPaddingBottom +
                    config.boxCaptionTextHeight + config.boxCaptionTextPaddingTop +
-                   (box.functions || []).length * (config.functionCaptionTextHeight + config.functionCaptionTextPaddingTop);
+                   (box.actions || []).length * (config.actionCaptionTextHeight + config.actionCaptionTextPaddingTop);
 
-      var functionY = box.y + config.boxCaptionTextHeight + config.boxCaptionTextPaddingTop + config.boxCaptionTextPaddingBottom;
-      for (let fun of box.functions || []) {
-        fun.x = box.x + config.boxCaptionTextPaddingLeft;
-        fun.y = functionY;
+      var actionY = b.y + config.boxCaptionTextHeight + config.boxCaptionTextPaddingTop + config.boxCaptionTextPaddingBottom;
+      for (let action of box.actions || []) {
+        var a = entities.actions[action.trigger];
 
-        functionY += config.functionCaptionTextHeight + config.functionCaptionTextPaddingTop;
+        a.x = b.x + config.boxCaptionTextPaddingLeft;
+        a.y = actionY;
+
+        actionY += config.actionCaptionTextHeight + config.actionCaptionTextPaddingTop;
       }
 
-      boxY += box.height + config.boxMarginBottom;
+      boxY += b.height + config.boxMarginBottom;
     }
 
     columnX += config.columnWidth + config.columnPadding;
   }
 
-  // Lines.
-  for (let connection of input.connections) {
-    let from = findBox(connection.from);
-    let to = findBox(connection.to);
+  // Connections.
+  for (let trigger in input.connections) {
+    if (input.connections.hasOwnProperty(trigger)) {
+      var connection = input.connections[trigger];
+      // mutable connection
+      var c = entities.connections[trigger];
 
-    connection.x = from.x + config.columnWidth;
-    connection.y = from.y + config.connectionSpacing * connection.fromConnectionI;
+      let from = entities.components[connection.from];
+      let to = entities.components[connection.to];
 
-    connection.xx = to.x;
-    connection.yy = to.y + config.connectionSpacing * connection.toConnectionI;
+      c.x = from.x + config.columnWidth;
+      c.y = from.y + config.connectionSpacing * connection.fromConnectionI;
+
+      c.xx = to.x;
+      c.yy = to.y + config.connectionSpacing * connection.toConnectionI;
+    }
   }
 }
+
 
 // https://gist.github.com/gre/1650294
 function easeInOutQuart(t) { return t<.5 ? 8*t*t*t*t : 1-8*(--t)*t*t*t };
 
 
-function drawAll() {
+function drawAll(entities) {
   canvas.width = canvas.width;
-  for (let column of window.input.columns) {
-    for (let box of column) {
-      // Draw box.
-      context.strokeRect(box.x, box.y, box.width, box.height);
+  for (let componentId in entities.components) {
+    if (entities.components.hasOwnProperty(componentId)) {
+      let component = entities.components[componentId];
 
-      context.fillText(box.caption,
-                       box.x + config.boxCaptionTextPaddingLeft,
-                       box.y + config.boxCaptionTextHeight + config.boxCaptionTextPaddingTop);
+      // Draw component box.
+      context.fillStyle = LIGHT;
+      context.strokeStyle = DARK;
+      context.fillRect(component.x, component.y, component.width, component.height);
+      context.strokeRect(component.x, component.y, component.width, component.height);
 
-      // Draw functions in box.
-      for (let fun of box.functions || []) {
-        context.fillText(fun.caption,
-                         fun.x + config.functionCaptionTextPaddingLeft,
-                         fun.y + config.functionCaptionTextPaddingTop + config.functionCaptionTextHeight);
+      context.fillStyle = DARK;
+
+      context.font = config.boxCaptionTextHeight + "px Helvetica Neue";
+      context.fillText(component.caption,
+                       component.x + config.boxCaptionTextPaddingLeft,
+                       component.y + config.boxCaptionTextHeight + config.boxCaptionTextPaddingTop);
+    }
+  }
+
+  for (let actionTrigger in entities.actions) {
+    if (entities.actions.hasOwnProperty(actionTrigger)) {
+      let action = entities.actions[actionTrigger];
+
+      // If the action is undergoing a transition this will be [0-9] else undefined.
+      var transition = actionTransitions[actionTrigger];
+
+      // Draw text and ball same colour if we're in a transition.
+      if (transition != undefined) {
+        context.fillStyle = action.colour;
+      } else {
+        context.fillStyle = DARK;
+      }
+
+      context.font = config.actionCaptionTextHeight + "px Helvetica Neue";
+      context.fillText(action.caption,
+                       action.x + config.actionCaptionTextPaddingLeft,
+                       action.y + config.actionCaptionTextPaddingTop + config.actionCaptionTextHeight);
+
+      if (transition != undefined) {
+        transition = Math.sin(Math.PI * transition);
+        context.beginPath();
+        context.arc(action.x + config.actionCaptionTextPaddingLeft / 2,
+                    action.y + config.actionCaptionTextPaddingTop + config.actionCaptionTextHeight / 2,
+                    transition * config.actionBallSize, 0, 2 * Math.PI, false);
+        context.fill();
       }
     }
   }
 
   // Draw connections
-  for (let connection of input.connections) {
-    // context.beginPath();
-    // context.moveTo(connection.x, connection.y);
-    // context.lineTo(connection.xx, connection.yy);
-    // context.stroke();
+  for (let connectionTrigger in entities.connections) {
+    if (entities.connections.hasOwnProperty(connectionTrigger)) {
+      var connection = entities.connections[connectionTrigger];
 
-    if (transitions[connection.id] != undefined) {
-      // var progress = easeInOutQuart(transitions[connection.id]);
-      var progress = Math.sin(Math.PI / 2 * transitions[connection.id]);
-      var scale = Math.sin(Math.PI * transitions[connection.id]);
+      if (connectionTransitions[connectionTrigger] != undefined) {
+        var value = connectionTransitions[connectionTrigger];
 
-      var x = (connection.xx - connection.x) * progress + connection.x;
-      var y = (connection.yy - connection.y) * progress + connection.y;
-      context.beginPath();
-      context.arc(x, y, scale * 10, 0, 2 * Math.PI, false);
-      // context.fillStyle = 'green';
-      context.fill();
-      // context.lineWidth = 5;
-      // context.strokeStyle = '#003300';
-      context.stroke();
+        var progress = Math.sin(Math.PI / 2 * value);
+        var scale = Math.sin(Math.PI * value);
+
+        var x;
+        var y; 
+
+        if (connection.reverse) {
+          x = (connection.x - connection.xx) * progress + connection.xx;
+          y = (connection.y - connection.yy) * progress + connection.yy;
+        } else {
+          x = (connection.xx - connection.x) * progress + connection.x;
+          y = (connection.yy - connection.y) * progress + connection.y;
+        }
+        
+
+        // Draw connecting line.
+        context.lineWidth = 1;
+        context.strokeStyle = LIGHT;
+
+        context.beginPath();
+        context.moveTo(connection.x, connection.y);
+        context.lineTo(connection.xx, connection.yy);
+        context.stroke();
+
+        // Draw ball
+        context.beginPath();
+        context.arc(x, y, scale * config.ballSize, 0, 2 * Math.PI, false);
+        context.fillStyle = connection.colour;
+        context.fill();
+
+        context.fillStyle = DARK;
+        context.font = config.ballAnnotationTextHeight + "px Helvetica Neue";
+        context.fillText(connection.caption, x, y);
+
+      }
+    }
+  }  
+}
+
+// Advance transitions and cue from the queue.
+function tickTransitions(entities) {
+  // Connections
+  for (let trigger in entities.connections) {
+    if (entities.connections.hasOwnProperty(trigger)) {
+
+      // Tick all transitions.
+      if (connectionTransitions[trigger] != undefined) {
+        connectionTransitions[trigger] += 0.01;
+      }
+     
+      // Finish those that are over.
+      if (connectionTransitions[trigger] > 1) {
+        connectionTransitions[trigger] = undefined;
+      }
+
+      // Cue transitions from the queue if the transition has finished.
+      // Undefined not > 0.
+      if (connectionTransitions[trigger] == undefined && connectionTransitionQueue[trigger] > 0) {
+        connectionTransitions[trigger] = 0;
+        connectionTransitionQueue[trigger] --;
+      }
+    }
+  }
+
+  // Actions
+  for (let trigger in entities.actions) {
+    if (entities.actions.hasOwnProperty(trigger)) {
+
+      // Tick all transitions.
+      if (actionTransitions[trigger] != undefined) {
+        actionTransitions[trigger] += 0.01;
+      }
+
+      // Finish those that are over.
+      if (actionTransitions[trigger] > 1) {
+        actionTransitions[trigger] = undefined;
+      }
+
+      // Cue transitions from the queue if the transition has finished.
+      // Undefined not > 0.
+      if (actionTransitions[trigger] == undefined && actionTransitionQueue[trigger] > 0) {
+        actionTransitions[trigger] = 0;
+        actionTransitionQueue[trigger] --;
+      }
     }
   }
 }
 
-function tick() {
-  tickTransitions();
-  drawAll();
+function triggerEvent(trigger, number, entities) {
+  
+  if (entities.connections.hasOwnProperty(trigger)) {
+    connectionTransitionQueue[trigger] = (connectionTransitionQueue[trigger] | 0 ) + number;
+  } else if (entities.actions.hasOwnProperty(trigger)) {
+    actionTransitionQueue[trigger] = (actionTransitionQueue[trigger] | 0 ) + number;
+  } else {
+    console.log("Didn't recognise", trigger)
+  }
 }
 
-  
-window.setInterval(tick, 10);
+function tick() {
+  tickTransitions(window.entities);
+  drawAll(window.entities);
+}
+
+// 'entities' contains input processed for layout and triggering.
+window.entities = buildEntities(window.input);
+connectAll(window.input, window.entities);
+layoutAll(window.input, window.entities);
+
+window.setInterval(tick, 5);
 
 
-connectAll();
-layoutAll();
-drawAll();
+var url = "ws://status.eventdata.crossref.org/socket";
+var socket = new WebSocket(url);
+socket.onopen = function() {
+  socket.send("start");
+}
+socket.onmessage = function(item) {
+  // beepQueue.push(item.data);
+  var parts = item.data.split(";");
+  // triggerEvent("wikipedia-agent/restbase-input/error", 10, window.entities);
+  // triggerEvent("wikipedia-agent/restbase-input/query", 10, window.entities);
+  triggerEvent(parts[0], parseInt(parts[1]), window.entities)
+};
+socket.onerror = function() {
+  console.log("error");
+}
