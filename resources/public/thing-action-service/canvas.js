@@ -24,12 +24,12 @@ window.input = {
      {
         id: "twitter",
         caption: "Twitter.com",
-        spacer: 70
+        spacer: 34
       },
       {
         id: "blogs",
         caption: "Blogs",
-        spacer: 120
+        spacer: 60
       },
       {
         id: "newsfeed",
@@ -38,12 +38,12 @@ window.input = {
       {
         id: "wikipedia",
         caption: "Wikipedia.org",
-        spacer: 110
+        spacer: 55
       },
       {
         id: "reddit",
         caption: "Reddit.com",
-        spacer: 150
+        spacer: 75
       }
 
     ],
@@ -108,7 +108,7 @@ window.input = {
                      caption: "received evidence", colour: MODE_NORMAL},
                     {trigger: "evidence-service/server/heartbeat",
                      caption: "heartbeat", colour: MODE_NORMAL}],
-        spacer: 400
+        spacer: 200
       }
 
     ],
@@ -117,7 +117,7 @@ window.input = {
       {
         id: "lagotto",
         caption: "Lagotto",
-        spacer: 400
+        spacer: 200
       },
       {
         id: "status-service",
@@ -178,7 +178,7 @@ window.config = {
   boxPaddingLeft: 20,
   boxPaddingRight: 20,
   boxMarginBottom: 20,
-  spacerUnit: 10,
+  spacerUnit: 1,
 
   paddingLeft: 20,
   paddingTop: 2,
@@ -308,7 +308,7 @@ function layoutAll(inputData, entities) {
       var b = entities.components[box.id];
 
       // Optional spacer to align things.
-      boxY += b.spacer || 0 * config.spacerUnit;
+      boxY += (b.spacer || 0) * config.spacerUnit;
 
       b.x = columnX;
       b.y = boxY;
