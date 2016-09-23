@@ -79,14 +79,14 @@ window.input = {
         actions: [{trigger: "wikipedia-agent/process/process-input",
                    caption: "process", colour: MODE_NORMAL},
                   {trigger: "wikipedia-agent/ingest/heartbeat", caption: "heartbeat", colour: MODE_NORMAL},
-                  {trigger: "wikipedia-agent/input/found-doi-removed", caption: "DOI Reference Removed", colour: MODE_ERROR},
-                  {trigger: "wikipedia-agent/input/found-doi-added", caption: "DOI Reference Added", colour: MODE_OK}]
+                  {trigger: "wikipedia-agent/input/found-doi-removed", caption: "event: reference removed", colour: MODE_ERROR},
+                  {trigger: "wikipedia-agent/input/found-doi-added", caption: "event: reference added", colour: MODE_OK}]
       },
       {
         id: "reddit-agent",
         caption: "Reddit Agent",
         actions: [{"trigger": "reddit-agent/ingest/heartbeat", caption: "heartbeat", colour: MODE_NORMAL},
-                  {"trigger": "reddit-agent/process/found-doi", caption: "found DOI", colour: MODE_OK}]
+                  {"trigger": "reddit-agent/process/found-doi", caption: "found event", colour: MODE_OK}]
       }
     ],
     // Internal processing
@@ -95,17 +95,17 @@ window.input = {
         id: "evidence-service",
         caption: "Evidence Service",
         actions: [{trigger: "evidence-service/api/get-artifact-current",
-                     caption: "get-artifact-current", colour: MODE_NORMAL},
+                     caption: "get current artifact", colour: MODE_NORMAL},
                     {trigger: "evidence-service/api/get-artifact-version",
-                     caption: "get-artifact-version", colour: MODE_NORMAL},
+                     caption: "get artifact version", colour: MODE_NORMAL},
                     {trigger: "evidence-service/api/get-artifact-versions",
-                     caption: "get-artifact-versions", colour: MODE_NORMAL},
+                     caption: "get all artifact versions", colour: MODE_NORMAL},
                     {trigger: "evidence-service/api/get-event-evidence",
-                     caption: "get-artifact-version", colour: MODE_NORMAL},
+                     caption: "get evidence record", colour: MODE_NORMAL},
                     {trigger: "get-event-evidence/api/get-list-all",
-                     caption: "get-list-all", colour: MODE_NORMAL},
+                     caption: "list all", colour: MODE_NORMAL},
                     {trigger: "evidence-service/api/receive-evidence",
-                     caption: "receive-evidence", colour: MODE_NORMAL},
+                     caption: "received evidence", colour: MODE_NORMAL},
                     {trigger: "evidence-service/server/heartbeat",
                      caption: "heartbeat", colour: MODE_NORMAL}],
         spacer: 400
@@ -537,10 +537,7 @@ socket.onopen = function() {
   socket.send("start");
 }
 socket.onmessage = function(item) {
-  // beepQueue.push(item.data);
   var parts = item.data.split(";");
-  // triggerEvent("wikipedia-agent/restbase-input/error", 10, window.entities);
-  // triggerEvent("wikipedia-agent/restbase-input/query", 10, window.entities);
   triggerEvent(parts[0], parseInt(parts[1]), window.entities)
 };
 socket.onerror = function() {
