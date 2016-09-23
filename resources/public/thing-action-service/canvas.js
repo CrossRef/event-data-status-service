@@ -10,29 +10,40 @@ MODE_OK = "#33ef40";
 MODE_ERROR = "#ef3340";
 
 window.input = {
+  ignore: [
+    "twitter-agent/input/report-queue-sizes",
+    "twitter-agent/input/input-queue",
+    "wikipedia-agent/process/input-queue",
+    "wikipedia-agent/input/queue-sizes"
+  ],
+
   columns:
   [
-    // External stuff
+    // External services
     [
      {
         id: "twitter",
-        caption: "Twitter.com"
+        caption: "Twitter.com",
+        spacer: 70
       },
       {
         id: "blogs",
-        caption: "Blogs"
+        caption: "Blogs",
+        spacer: 120
       },
       {
-        id: "newsfeeds",
+        id: "newsfeed",
         caption: "Newsfeeds"
       },
       {
         id: "wikipedia",
-        caption: "Wikipedia.org"
+        caption: "Wikipedia.org",
+        spacer: 110
       },
       {
         id: "reddit",
-        caption: "Reddit.com"
+        caption: "Reddit.com",
+        spacer: 150
       }
 
     ],
@@ -46,42 +57,36 @@ window.input = {
                   {trigger: "twitter-agent/ingest/heartbeat",
                    caption: "heartbeat", colour: MODE_NORMAL},
                   {trigger: "twitter-agent/process/found-dois",
-                   caption: "found DOI", colour: MODE_OK},
-                   ]
-       // ignore twitter-agent/input/report-queue-sizes
-       // twitter-agent/input/input-queue
+                   caption: "found event", colour: MODE_OK}]
       },
       {
         id: "newsfeed-agent",
         caption: "Newsfeed Agent",
         actions: [{trigger: "newsfeed-agent/feed/analyze-item",
-                     caption: "analyze-item", colour: MODE_NORMAL},
+                     caption: "analyze", colour: MODE_NORMAL},
                     {trigger: "newsfeed-agent/feed/found-item",
-                     caption: "found-item", colour: MODE_OK},
+                     caption: "found event", colour: MODE_OK},
                     {trigger: "newsfeed-agent/feed/heartbeat",
                      caption: "heartbeat", colour: MODE_NORMAL},
                     {trigger: "newsfeed-agent/feed/check-all-newsfeeds",
-                     caption: "check-all-newsfeeds", colour: MODE_NORMAL},
+                     caption: "check all newsfeeds", colour: MODE_NORMAL},
                     {trigger: "newsfeed-agent/ingest/heartbeat",
-                     caption: "ingest heartbeat", colour: MODE_NORMAL}]
+                     caption: "ingest", colour: MODE_NORMAL}]
       },
       {
         id: "wikipedia-agent",
         caption: "Wikipedia Agent",
-        actions: [// scalar
-                  //{trigger: "wikipedia-agent/process/input-queue",
-                  // caption: "input", colour: MODE_NORMAL},
-                  {trigger: "wikipedia-agent/process/process-input",
+        actions: [{trigger: "wikipedia-agent/process/process-input",
                    caption: "process", colour: MODE_NORMAL},
                   {trigger: "wikipedia-agent/ingest/heartbeat", caption: "heartbeat", colour: MODE_NORMAL},
-                  {trigger: "wikipedia-agent/input/found-doi-removed", caption: "DOI Removed", colour: MODE_ERROR},
-                  {trigger: "wikipedia-agent/input/found-doi-added", caption: "DOI Removed", colour: MODE_OK}]
-        // scalar: wikipedia-agent/input/queue-sizes
+                  {trigger: "wikipedia-agent/input/found-doi-removed", caption: "DOI Reference Removed", colour: MODE_ERROR},
+                  {trigger: "wikipedia-agent/input/found-doi-added", caption: "DOI Reference Added", colour: MODE_OK}]
       },
       {
         id: "reddit-agent",
         caption: "Reddit Agent",
-        actions: [{"trigger": "reddit-agent/ingest/heartbeat", caption: "heartbeat", colour: MODE_NORMAL}]
+        actions: [{"trigger": "reddit-agent/ingest/heartbeat", caption: "heartbeat", colour: MODE_NORMAL},
+                  {"trigger": "reddit-agent/process/found-doi", caption: "found DOI", colour: MODE_OK}]
       }
     ],
     // Internal processing
@@ -102,8 +107,8 @@ window.input = {
                     {trigger: "evidence-service/api/receive-evidence",
                      caption: "receive-evidence", colour: MODE_NORMAL},
                     {trigger: "evidence-service/server/heartbeat",
-                     caption: "heartbeat", colour: MODE_NORMAL}
-                     ]
+                     caption: "heartbeat", colour: MODE_NORMAL}],
+        spacer: 400
       }
 
     ],
@@ -111,7 +116,8 @@ window.input = {
     [
       {
         id: "lagotto",
-        caption: "Lagotto"
+        caption: "Lagotto",
+        spacer: 400
       },
       {
         id: "status-service",
@@ -151,13 +157,13 @@ window.input = {
    "newsfeed-agent/evidence/sent": {from: "newsfeed-agent", to: "evidence-service", reverse: false, colour: MODE_NORMAL, caption: "evidence"},
    "newsfeed-agent/evidence/sent-ok": {from: "newsfeed-agent", to: "evidence-service", reverse: true, colour: MODE_OK, caption: "evidence"},
    "newsfeed-agent/evidence/sent-error": {from: "newsfeed-agent", to: "evidence-service", reverse: true, colour: MODE_ERROR, caption: "evidence"},
+   "newsfeed-agent/feed/fetch-feed": {from: "newsfeed", to: "newsfeed-agent", reverse: false, colour: MODE_NORMAL, caption: "fetch feed"},
 
-   "reddit-agent/evidence/sent": {from: "reddit-agent", to: "evidence-service", reverse: true, colour: MODE_NORMAL, caption: "artifact"},
+   "reddit-agent/evidence/sent": {from: "reddit-agent", to: "evidence-service", reverse: false, colour: MODE_NORMAL, caption: "artifact"},
    "reddit-agent/evidence/sent-ok": {from: "reddit-agent", to: "evidence-service", reverse: true, colour: MODE_OK, caption: "artifact"},
    "reddit-agent/evidence/sent-error": {from: "reddit-agent", to: "evidence-service", reverse: true, colour: MODE_ERROR, caption: "artifact"},
    "reddit-agent/reddit/fetch-page": {from: "reddit", to: "reddit-agent", reverse: true, colour: MODE_NORMAL, caption: "fetch"},
    "reddit-agent/reddit/authenticate": {from: "reddit", to: "reddit-agent", reverse: true, colour: MODE_NORMAL, caption: "authenticate"}
-
   }
 };
 
@@ -168,19 +174,19 @@ window.config = {
 
   boxHeight: 80,
   boxPaddingTop: 20,
-  boxPaddingBottom: 20,
+  boxPaddingBottom: 0,
   boxPaddingLeft: 20,
   boxPaddingRight: 20,
   boxMarginBottom: 20,
-
+  spacerUnit: 10,
 
   paddingLeft: 20,
-  paddingTop: 0,
+  paddingTop: 2,
 
   boxCaptionTextHeight: 20,
   boxCaptionTextPaddingTop: 8,
   boxCaptionTextPaddingLeft: 15,
-  boxCaptionTextPaddingBottom: 10,
+  boxCaptionTextPaddingBottom: 0,
 
   actionCaptionTextHeight: 15,
   actionCaptionTextPaddingTop: 8,
@@ -237,11 +243,14 @@ function buildEntities(inputData) {
     components: {},
 
     // action trigger => info
-    actions: {}
+    actions: {},
+
+    // ignored twitter => nothing
+    ignore: {}
   };
 
   // Index box by id and actions by triggers.
-  for (let stage of window.input.columns) {
+  for (let stage of inputData.columns) {
     for (let column of stage) {
       for (let component of stage) {
         // Assign used here for only 1-deep copying.
@@ -254,10 +263,15 @@ function buildEntities(inputData) {
     }
   }
 
-  for (let trigger in window.input.connections) {
-    if (window.input.connections.hasOwnProperty(trigger)) {
-      entities.connections[trigger] = Object.assign(window.input.connections[trigger]);
+  for (let trigger in inputData.connections) {
+    if (inputData.connections.hasOwnProperty(trigger)) {
+      entities.connections[trigger] = Object.assign(inputData.connections[trigger]);
     }
+  }
+
+  for (let trigger of inputData.ignore) {
+    
+    entities.ignore[trigger] = {};
   }
 
   return entities;
@@ -266,7 +280,6 @@ function buildEntities(inputData) {
 // Assign connections to boxes.
 // Takes input config and mutable 'entities' object. Modify 'entities' in-place.
 function connectAll(inputData, entities) {
-  console.log("Layout");
   for (let trigger in inputData.connections) {
     if (inputData.connections.hasOwnProperty(trigger)) {
       var connection = inputData.connections[trigger];
@@ -294,6 +307,9 @@ function layoutAll(inputData, entities) {
       // The mutable object for this box.
       var b = entities.components[box.id];
 
+      // Optional spacer to align things.
+      boxY += b.spacer || 0 * config.spacerUnit;
+
       b.x = columnX;
       b.y = boxY;
       b.width = config.columnWidth;
@@ -312,6 +328,8 @@ function layoutAll(inputData, entities) {
       }
 
       boxY += b.height + config.boxMarginBottom;
+
+      
     }
 
     columnX += config.columnWidth + config.columnPadding;
@@ -416,13 +434,13 @@ function drawAll(entities) {
         
 
         // Draw connecting line.
-        context.lineWidth = 1;
-        context.strokeStyle = LIGHT;
+        // context.lineWidth = 1;
+        // context.strokeStyle = LIGHT;
 
-        context.beginPath();
-        context.moveTo(connection.x, connection.y);
-        context.lineTo(connection.xx, connection.yy);
-        context.stroke();
+        // context.beginPath();
+        // context.moveTo(connection.x, connection.y);
+        // context.lineTo(connection.xx, connection.yy);
+        // context.stroke();
 
         // Draw ball
         context.beginPath();
@@ -489,11 +507,12 @@ function tickTransitions(entities) {
 }
 
 function triggerEvent(trigger, number, entities) {
-  
   if (entities.connections.hasOwnProperty(trigger)) {
     connectionTransitionQueue[trigger] = (connectionTransitionQueue[trigger] | 0 ) + number;
   } else if (entities.actions.hasOwnProperty(trigger)) {
     actionTransitionQueue[trigger] = (actionTransitionQueue[trigger] | 0 ) + number;
+  } else if (entities.ignore.hasOwnProperty(trigger)) {
+    // just ignore. some things aren't suitable for this display
   } else {
     console.log("Didn't recognise", trigger)
   }
