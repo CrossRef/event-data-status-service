@@ -214,8 +214,9 @@ p.heading {
   }
 
   function beep(path, count) {
+
     var pitch = ((stringHashcode(path) / 0xFFFFFF) * pitchRange) + lowerPitch;
-    oscillator.frequency.setValueAtTime(pitch,0);
+    oscillator.frequency.setValueAtTime(pitch, context.currentTime);
     if (! quiet) {
       gain.gain.value = 1;
     }
