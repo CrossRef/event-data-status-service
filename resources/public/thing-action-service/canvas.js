@@ -202,25 +202,39 @@ window.config = {
 // 2 on retina, 1 normal.
 var ratio = window.devicePixelRatio;
 
-var canvas = document.getElementById("canvas");
+// Foreground and background canvas.
+var canvasF = document.getElementById("canvas-f");
+var canvasB = document.getElementById("canvas-b");
+var contextF = canvasF.getContext("2d");
+var contextB = canvasB.getContext("2d");
+
 var header = document.getElementById("header");
-var context = canvas.getContext("2d");
 var width = (document.body.clientWidth);
 var height = (document.body.clientHeight - header.clientHeight);
 
-context.scale(ratio,ratio);
-canvas.width = width * ratio;
-canvas.height = height * ratio;
-canvas.style.width = width + "px";
-canvas.style.height = height + "px";
+contextF.scale(ratio,ratio);
+canvasF.width = width * ratio;
+canvasF.height = height * ratio;
+canvasF.style.width = width + "px";
+canvasF.style.height = height + "px";
 
-// Scale all config values;
+contextB.scale(ratio,ratio);
+canvasB.width = width * ratio;
+canvasB.height = height * ratio;
+canvasB.style.width = width + "px";
+canvasB.style.height = height + "px";
+
+
+// Scale all config values, then add pre-calculated strings.
 for (var key in window.config) {
   if (window.config.hasOwnProperty(key)) {
     window.config[key] *= ratio;
   }
 }
 
+window.config.boxCaptionTextHeightS = config.boxCaptionTextHeight + "px Helvetica Neue";
+window.config.actionCaptionTextHeightS = config.actionCaptionTextHeight + "px Helvetica Neue";
+window.config.ballAnnotationTextHeightS = config.ballAnnotationTextHeight + "px Helvetica Neue";
 
 // There can be one transition per action / connection. 
 // Represent float status [0,1] of transition.
@@ -358,28 +372,32 @@ function layoutAll(inputData, entities) {
 // https://gist.github.com/gre/1650294
 function easeInOutQuart(t) { return t<.5 ? 8*t*t*t*t : 1-8*(--t)*t*t*t };
 
+function drawAllBackground(entities) {
+  canvasB.width = canvasB.width;
 
-function drawAll(entities) {
-  canvas.width = canvas.width;
   for (let componentId in entities.components) {
     if (entities.components.hasOwnProperty(componentId)) {
       let component = entities.components[componentId];
 
       // Draw component box.
-      context.fillStyle = LIGHT;
-      context.strokeStyle = DARK;
-      context.fillRect(component.x, component.y, component.width, component.height);
-      context.strokeRect(component.x, component.y, component.width, component.height);
+      contextB.fillStyle = LIGHT;
+      contextB.strokeStyle = DARK;
+      contextB.fillRect(component.x, component.y, component.width, component.height);
+      contextB.strokeRect(component.x, component.y, component.width, component.height);
 
-      context.fillStyle = DARK;
+      contextB.fillStyle = DARK;
 
-      context.font = config.boxCaptionTextHeight + "px Helvetica Neue";
-      context.fillText(component.caption,
+      contextB.font = config.boxCaptionTextHeightS;
+      contextB.fillText(component.caption,
                        component.x + config.boxCaptionTextPaddingLeft,
                        component.y + config.boxCaptionTextHeight + config.boxCaptionTextPaddingTop);
     }
   }
+}
 
+function drawAllForeground(entities) {
+  canvasF.width = canvasF.width;
+  
   for (let actionTrigger in entities.actions) {
     if (entities.actions.hasOwnProperty(actionTrigger)) {
       let action = entities.actions[actionTrigger];
@@ -389,23 +407,23 @@ function drawAll(entities) {
 
       // Draw text and ball same colour if we're in a transition.
       if (transition != undefined) {
-        context.fillStyle = action.colour;
+        contextF.fillStyle = action.colour;
       } else {
-        context.fillStyle = DARK;
+        contextF.fillStyle = DARK;
       }
 
-      context.font = config.actionCaptionTextHeight + "px Helvetica Neue";
-      context.fillText(action.caption,
+      contextF.font = config.actionCaptionTextHeightS;
+      contextF.fillText(action.caption,
                        action.x + config.actionCaptionTextPaddingLeft,
                        action.y + config.actionCaptionTextPaddingTop + config.actionCaptionTextHeight);
 
       if (transition != undefined) {
         transition = Math.sin(Math.PI * transition);
-        context.beginPath();
-        context.arc(action.x + config.actionCaptionTextPaddingLeft / 2,
+        contextF.beginPath();
+        contextF.arc(action.x + config.actionCaptionTextPaddingLeft / 2,
                     action.y + config.actionCaptionTextPaddingTop + config.actionCaptionTextHeight / 2,
                     transition * config.actionBallSize, 0, 2 * Math.PI, false);
-        context.fill();
+        contextF.fill();
       }
     }
   }
@@ -443,14 +461,14 @@ function drawAll(entities) {
         // context.stroke();
 
         // Draw ball
-        context.beginPath();
-        context.arc(x, y, scale * config.ballSize, 0, 2 * Math.PI, false);
-        context.fillStyle = connection.colour;
-        context.fill();
+        contextF.beginPath();
+        contextF.arc(x, y, scale * config.ballSize, 0, 2 * Math.PI, false);
+        contextF.fillStyle = connection.colour;
+        contextF.fill();
 
-        context.fillStyle = DARK;
-        context.font = config.ballAnnotationTextHeight + "px Helvetica Neue";
-        context.fillText(connection.caption, x, y);
+        contextF.fillStyle = DARK;
+        contextF.font = config.ballAnnotationTextHeightS;
+        contextF.fillText(connection.caption, x, y);
 
       }
     }
@@ -518,9 +536,13 @@ function triggerEvent(trigger, number, entities) {
   }
 }
 
-function tick() {
+function tickBackground() {
+  drawAllBackground(window.entities);
+}
+
+function tickForeground() {
   tickTransitions(window.entities);
-  drawAll(window.entities);
+  drawAllForeground(window.entities);
 }
 
 // 'entities' contains input processed for layout and triggering.
@@ -528,8 +550,9 @@ window.entities = buildEntities(window.input);
 connectAll(window.input, window.entities);
 layoutAll(window.input, window.entities);
 
-window.setInterval(tick, 5);
-
+window.setInterval(tickForeground, 5);
+window.setInterval(tickBackground, 1000);
+tickBackground();
 
 var url = "ws://status.eventdata.crossref.org/socket";
 var socket = new WebSocket(url);
